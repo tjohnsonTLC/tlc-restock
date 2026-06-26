@@ -289,6 +289,7 @@ const saved = JSON.parse(localStorage.getItem('tlc_tech')||'{}');
 if(saved.name)  document.getElementById('tech-name').value = saved.name;
 if(saved.truck) document.getElementById('truck-num').value = saved.truck;
 if(saved.trade) document.getElementById('trade').value = saved.trade;
+document.getElementById('work-order').value = ''; // always clear WO on load
 
 // ── MODE SWITCH ──
 function setMode(mode) {
