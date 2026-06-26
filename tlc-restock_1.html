@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>TLC — Truck Restock</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #263C73;
+  --red: #EE202E;
+  --bg: #F5F5F5;
+  --surface: #FFFFFF;
+  --border: #E0E0E0;
+  --text: #1A1A1A;
+  --muted: #6B6B6B;
+  --light: #F0F2F7;
+  --success-bg: #E8F5EE;
+  --pending-bg: #FFF8E1; --pending-border: #F5C518; --pending-text: #7A5500;
+  --done-bg: #E8F5EE; --done-border: #4CAF8A; --done-text: #1B5E3A;
+  --empty-bg: #FDECEA; --empty-border: #EE202E; --empty-text: #8B0000;
+  --low-bg: #FFF3CD; --low-border: #FFC107; --low-text: #6D4C00;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 2rem; }
+
+/* ── TOPBAR ── */
+.topbar { background: var(--navy); padding: 0 16px; display: flex; align-items: center; height: 52px; gap: 10px; position: sticky; top: 0; z-index: 20; }
+.tlc-mark { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.tlc-mark span { display: block; width: 5px; background: var(--red); border-radius: 1px; }
+.tlc-mark span:nth-child(1) { height: 20px; }
+.tlc-mark span:nth-child(2) { height: 14px; opacity: 0.7; }
+.tlc-mark span:nth-child(3) { height: 9px; opacity: 0.4; }
+.topbar-title { color: #fff; font-size: 15px; font-weight: 700; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.mode-toggle { display: flex; background: rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden; }
+.mode-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; border: none; background: transparent; color: rgba(255,255,255,0.6); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.mode-btn.active { background: rgba(255,255,255,0.22); color: #fff; }
+.topbar-date { color: rgba(255,255,255,0.4); font-size: 11px; }
+
+/* ── VIEWS ── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── TECH VIEW ── */
+.content { padding: 14px; max-width: 520px; margin: 0 auto; }
+.section { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 16px; margin-bottom: 12px; }
+.section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--navy); margin-bottom: 12px; }
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; font-weight: 500; }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 15px; color: var(--text); background: var(--surface);
+  -webkit-appearance: none; appearance: none; font-family: inherit;
+}
+.field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B6B6B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+}
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(38,60,115,0.08); }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.photo-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.photo-entry { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.photo-entry-top { position: relative; width: 100%; height: 150px; background: #e8e8e8; }
+.photo-entry-top img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-del { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; background: rgba(0,0,0,0.65); border: none; border-radius: 50%; color: #fff; font-size: 16px; line-height: 26px; text-align: center; cursor: pointer; }
+.bin-badge { position: absolute; top: 8px; left: 8px; background: var(--navy); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; }
+.photo-entry-bottom { padding: 10px 12px; display: flex; align-items: center; gap: 10px; background: var(--surface); }
+.qty-label { font-size: 13px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+.qty-controls { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.qty-btn { width: 36px; height: 36px; background: var(--light); border: none; font-size: 20px; color: var(--navy); cursor: pointer; display: flex; align-items: center; justify-content: center; padding-bottom: 2px; }
+.qty-btn:active { background: var(--border); }
+.qty-input { width: 52px; height: 36px; border: none; border-left: 1px solid var(--border); border-right: 1px solid var(--border); text-align: center; font-size: 16px; font-weight: 600; color: var(--text); background: var(--surface); -webkit-appearance: none; appearance: none; }
+.qty-input:focus { outline: none; background: #f0f4ff; }
+.qty-input::-webkit-inner-spin-button, .qty-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.qty-input[type=number] { -moz-appearance: textfield; }
+.qty-note { font-size: 12px; color: var(--muted); flex: 1; }
+
+.upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.15s; }
+.upload-zone:active { background: var(--light); border-color: var(--navy); }
+.upload-zone .icon { font-size: 26px; margin-bottom: 6px; }
+.upload-zone p { font-size: 14px; font-weight: 500; color: var(--text); }
+.upload-zone small { font-size: 12px; color: var(--muted); }
+
+.submit-btn { width: 100%; padding: 14px; background: var(--navy); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.submit-btn:active { opacity: 0.85; }
+.submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.submit-btn .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.status-msg { text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 18px; }
+.ai-note { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; line-height: 1.4; }
+.req-dot { display: inline-block; width: 5px; height: 5px; background: var(--red); border-radius: 50%; vertical-align: middle; margin-left: 3px; }
+
+.success-screen { display: none; text-align: center; padding: 40px 20px; }
+.success-screen.show { display: block; }
+.success-icon { width: 64px; height: 64px; background: var(--success-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; }
+.success-screen h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.success-screen p { font-size: 14px; color: var(--muted); line-height: 1.5; margin-bottom: 24px; }
+.next-wo-btn { width: 100%; padding: 14px; background: var(--navy); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
+.done-btn { width: 100%; padding: 12px; background: var(--light); color: var(--muted); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.form-wrap.hidden { display: none; }
+
+/* ── WAREHOUSE VIEW ── */
+.wh-wrap { padding: 0 0 24px; }
+.stats-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; gap: 0; overflow-x: auto; }
+.stat { padding: 12px 16px 12px 0; margin-right: 16px; border-right: 1px solid var(--border); white-space: nowrap; flex-shrink: 0; }
+.stat:last-child { border-right: none; }
+.stat-val { font-size: 22px; font-weight: 700; color: var(--navy); line-height: 1; margin-bottom: 2px; }
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.wh-toolbar { padding: 12px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--surface); border-bottom: 1px solid var(--border); }
+.filter-btn { padding: 5px 11px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.filter-btn.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.wh-search { padding: 6px 12px; border: 1px solid var(--border); border-radius: 20px; font-size: 13px; width: 160px; background: var(--surface); }
+.wh-search:focus { outline: none; border-color: var(--navy); }
+.refresh-btn { margin-left: auto; padding: 6px 12px; background: var(--light); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+.queue-wrap { padding: 14px 16px; }
+.queue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+
+.req-card { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+.req-card.done { opacity: 0.55; }
+.card-head { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
+.truck-badge { background: var(--navy); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
+.card-head-info { flex: 1; min-width: 0; }
+.tech-name { font-size: 14px; font-weight: 600; }
+.trade-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.wo-tag { display: inline-block; background: #EEF2FF; color: var(--navy); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; margin-top: 3px; }
+.status-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+.status-badge.pending { background: var(--pending-bg); color: var(--pending-text); border: 1px solid var(--pending-border); }
+.status-badge.done { background: var(--done-bg); color: var(--done-text); border: 1px solid var(--done-border); }
+
+.card-body { padding: 10px 14px; }
+.item-list { list-style: none; }
+.item-row { display: flex; align-items: center; gap: 7px; padding: 5px 0; border-bottom: 1px solid var(--light); font-size: 13px; }
+.item-row:last-child { border-bottom: none; }
+.item-pill { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; flex-shrink: 0; }
+.item-pill.EMPTY { background: var(--empty-bg); color: var(--empty-text); border: 1px solid var(--empty-border); }
+.item-pill.LOW { background: var(--low-bg); color: var(--low-text); border: 1px solid var(--low-border); }
+.item-desc { flex: 1; color: var(--text); }
+.item-qty { color: var(--muted); font-size: 12px; white-space: nowrap; font-weight: 600; }
+.item-check { width: 18px; height: 18px; border: 1.5px solid var(--border); border-radius: 4px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
+.item-check.checked { background: var(--done-bg); border-color: var(--done-border); color: var(--done-text); font-size: 11px; }
+.item-row.pulled .item-desc { text-decoration: line-through; color: var(--muted); }
+.card-summary { padding: 7px 10px; background: var(--light); border-radius: 6px; font-size: 12px; color: var(--muted); margin-top: 8px; font-style: italic; }
+.card-notes { padding: 7px 10px; background: #FFFDE7; border-radius: 6px; font-size: 12px; color: #5D4037; margin-top: 6px; border-left: 3px solid #FFC107; }
+.card-foot { padding: 9px 14px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.photo-badge { font-size: 11px; color: var(--muted); background: var(--light); padding: 3px 8px; border-radius: 10px; }
+.mark-done-btn { margin-left: auto; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--muted); }
+.mark-done-btn:hover { background: var(--done-bg); border-color: var(--done-border); color: var(--done-text); }
+.mark-done-btn.done-state { background: var(--done-bg); border-color: var(--done-border); color: var(--done-text); }
+
+.live-dot { width: 7px; height: 7px; background: #4CAF8A; border-radius: 50%; animation: pulse 2s ease-in-out infinite; display: inline-block; margin-right: 4px; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); grid-column: 1/-1; }
+.empty-state .ei { font-size: 40px; margin-bottom: 10px; }
+.empty-state h3 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.empty-state p { font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tlc-mark"><span></span><span></span><span></span></div>
+  <div class="topbar-title">TLC Restock</div>
+  <div class="topbar-right">
+    <span class="topbar-date" id="today-date"></span>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btn-tech" onclick="setMode('tech')">📱 Tech</button>
+      <button class="mode-btn" id="btn-warehouse" onclick="setMode('warehouse')">🏭 Warehouse</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ TECH VIEW ══════════ -->
+<div class="view active" id="view-tech">
+  <div class="content">
+
+    <div class="success-screen" id="success-screen">
+      <div class="success-icon">✓</div>
+      <h2>WO submitted</h2>
+      <p id="success-msg">Your restocking request has been sent to the warehouse.</p>
+      <button class="next-wo-btn" onclick="nextWO()">Submit another WO</button>
+      <button class="done-btn" onclick="allDone()">Done for the day</button>
+    </div>
+
+    <div class="form-wrap" id="form-wrap">
+      <div class="section">
+        <div class="section-label">Your info</div>
+        <div class="row">
+          <div class="field">
+            <label>Tech name <span class="req-dot"></span></label>
+            <input type="text" id="tech-name" placeholder="First Last" autocomplete="name" />
+          </div>
+          <div class="field">
+            <label>Truck # <span class="req-dot"></span></label>
+            <input type="text" id="truck-num" placeholder="T-42" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Work order # <span class="req-dot"></span></label>
+            <input type="text" id="work-order" placeholder="WO-1234" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>Trade <span class="req-dot"></span></label>
+            <select id="trade">
+              <option value="">Select…</option>
+              <optgroup label="Residential">
+                <option value="Res Plumbing">Res Plumbing</option>
+                <option value="Res HVAC">Res HVAC</option>
+                <option value="Res Electrical">Res Electrical</option>
+              </optgroup>
+              <optgroup label="Commercial">
+                <option value="Comm Plumbing">Comm Plumbing</option>
+                <option value="Comm HVAC">Comm HVAC</option>
+                <option value="Comm Electrical">Comm Electrical</option>
+              </optgroup>
+              <optgroup label="Drains">
+                <option value="Drains/Sewer">Drains/Sewer</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Bin photos <span class="req-dot"></span></div>
+        <div class="photo-list" id="photo-list"></div>
+        <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+          <div class="icon">📸</div>
+          <p>Tap to add a bin photo</p>
+          <small>One photo per bin — set quantity needed below each</small>
+        </div>
+        <input type="file" id="file-input" accept="image/*" capture="environment" style="display:none;" onchange="handleFile(event)" />
+      </div>
+
+      <div class="section">
+        <div class="section-label">Notes for warehouse</div>
+        <div class="field">
+          <textarea id="notes" rows="2" placeholder="Anything specific to call out…" style="resize:none;"></textarea>
+        </div>
+      </div>
+
+      <button class="submit-btn" id="submit-btn" onclick="submitRequest()">
+        <span id="btn-label">Submit restocking request</span>
+      </button>
+      <p class="ai-note">AI identifies parts from photos and matches to parts catalog</p>
+      <p class="status-msg" id="status-msg"></p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════ WAREHOUSE VIEW ══════════ -->
+<div class="view" id="view-warehouse">
+  <div class="wh-wrap">
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-val" id="stat-pending">0</div><div class="stat-label">Pending</div></div>
+      <div class="stat"><div class="stat-val" id="stat-items">0</div><div class="stat-label">Items to pull</div></div>
+      <div class="stat"><div class="stat-val" id="stat-done">0</div><div class="stat-label">Done today</div></div>
+      <div class="stat"><div class="stat-val" id="stat-trucks">0</div><div class="stat-label">Trucks</div></div>
+    </div>
+    <div class="wh-toolbar">
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('pending',this)">Pending</button>
+      <button class="filter-btn" onclick="setFilter('done',this)">Done</button>
+      <button class="filter-btn" onclick="setFilter('Res',this)">Residential</button>
+      <button class="filter-btn" onclick="setFilter('Comm',this)">Commercial</button>
+      <button class="filter-btn" onclick="setFilter('Drains',this)">Drains</button>
+      <input type="text" class="wh-search" id="wh-search" placeholder="Search tech / truck / WO…" oninput="renderQueue()" />
+      <button class="refresh-btn" onclick="loadRequests()"><span class="live-dot"></span>Refresh</button>
+    </div>
+    <div class="queue-wrap">
+      <div class="queue-grid" id="queue-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let photos = [];
+let allRequests = [];
+let itemStates = {};
+let currentFilter = 'all';
+
+// ── INIT ──
+document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+const saved = JSON.parse(localStorage.getItem('tlc_tech')||'{}');
+if(saved.name)  document.getElementById('tech-name').value = saved.name;
+if(saved.truck) document.getElementById('truck-num').value = saved.truck;
+if(saved.trade) document.getElementById('trade').value = saved.trade;
+
+// ── MODE SWITCH ──
+function setMode(mode) {
+  document.getElementById('view-tech').classList.toggle('active', mode==='tech');
+  document.getElementById('view-warehouse').classList.toggle('active', mode==='warehouse');
+  document.getElementById('btn-tech').classList.toggle('active', mode==='tech');
+  document.getElementById('btn-warehouse').classList.toggle('active', mode==='warehouse');
+  if(mode==='warehouse') loadRequests();
+}
+
+// ── PHOTO HANDLING ──
+function handleFile(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    photos.push({data:ev.target.result, name:file.name, type:file.type, qty:1});
+    renderPhotos();
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+
+function renderPhotos() {
+  const list = document.getElementById('photo-list');
+  if(!photos.length){list.innerHTML='';return;}
+  list.innerHTML = photos.map((p,i)=>`
+    <div class="photo-entry">
+      <div class="photo-entry-top">
+        <img src="${p.data}" alt="Bin ${i+1}" />
+        <div class="bin-badge">BIN ${i+1}</div>
+        <button class="photo-del" onclick="removePhoto(${i})">×</button>
+      </div>
+      <div class="photo-entry-bottom">
+        <span class="qty-label">Qty needed</span>
+        <div class="qty-controls">
+          <button class="qty-btn" onclick="adjustQty(${i},-1)">−</button>
+          <input class="qty-input" type="number" min="1" value="${p.qty}" id="qty-${i}"
+            onchange="setQty(${i},this.value)" oninput="setQty(${i},this.value)" />
+          <button class="qty-btn" onclick="adjustQty(${i},1)">+</button>
+        </div>
+        <span class="qty-note">units</span>
+      </div>
+    </div>`).join('');
+}
+
+function adjustQty(i,delta){
+  const v = Math.max(1,(photos[i].qty||1)+delta);
+  photos[i].qty=v;
+  const el=document.getElementById('qty-'+i);
+  if(el) el.value=v;
+}
+function setQty(i,val){const n=parseInt(val);photos[i].qty=(isNaN(n)||n<1)?1:n;}
+function removePhoto(i){photos.splice(i,1);renderPhotos();}
+function setStatus(msg){document.getElementById('status-msg').textContent=msg;}
+
+// ── SUBMIT ──
+async function submitRequest() {
+  const name  = document.getElementById('tech-name').value.trim();
+  const truck = document.getElementById('truck-num').value.trim();
+  const trade = document.getElementById('trade').value;
+  const wo    = document.getElementById('work-order').value.trim();
+  const notes = document.getElementById('notes').value.trim();
+
+  if(!name)   {setStatus('Enter your name.');return;}
+  if(!truck)  {setStatus('Enter your truck number.');return;}
+  if(!trade)  {setStatus('Select your trade.');return;}
+  if(!wo)     {setStatus('Enter a work order number.');return;}
+  if(!photos.length){setStatus('Add at least one bin photo.');return;}
+
+  localStorage.setItem('tlc_tech', JSON.stringify({name,truck,trade}));
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  document.getElementById('btn-label').innerHTML = '<div class="spinner"></div>';
+  setStatus('Analyzing photos…');
+
+  const dateStr = new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const timeStr = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const photoSummary = photos.map((p,i)=>`Bin ${i+1}: tech needs ${p.qty} unit(s)`).join('\n');
+
+  const content=[{
+    type:'text',
+    text:`You are an inventory analyst for TLC Services (plumbing, HVAC, electrical) in Albuquerque, NM.
+
+Tech: ${name} | Truck: ${truck} | Trade: ${trade} | WO: ${wo}
+Date: ${dateStr} at ${timeStr}
+${notes?`Tech notes: ${notes}`:''}
+
+Tech-supplied quantities (use exactly as qty_needed):
+${photoSummary}
+
+Identify the part in each bin photo as precisely as possible. Return ONLY valid JSON, no other text:
+{"items":[{"description":"precise part name, size, type, material","status":"LOW or EMPTY","qty_needed":"use tech quantity","bin_photo":1}],"summary":"one sentence summary"}
+
+Be specific: e.g. "1/2 inch PVC slip coupling", "3/4 inch ball valve", "15A single-pole breaker". Only list bins needing restock.`
+  },
+  ...photos.map(p=>({type:'image',source:{type:'base64',media_type:p.type||'image/jpeg',data:p.data.split(',')[1]}}))];
+
+  try {
+    setStatus('Matching to parts catalog…');
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content}]})
+    });
+    const data = await resp.json();
+    const rawText = data.content?.find(b=>b.type==='text')?.text||'{}';
+    let parsed;
+    try{parsed=JSON.parse(rawText.replace(/```json|```/g,'').trim());}
+    catch{parsed={items:[],summary:rawText};}
+
+    const request={
+      id:'REQ-'+Date.now(),
+      timestamp:new Date().toISOString(),
+      tech:name, truck, trade, work_order:wo, notes,
+      photo_count:photos.length,
+      items:parsed.items||[],
+      summary:parsed.summary||'',
+      status:'pending'
+    };
+
+    saveRequest(request);
+    setStatus('');
+    document.getElementById('form-wrap').classList.add('hidden');
+    document.getElementById('success-msg').textContent =
+      `${parsed.items?.length||0} item${parsed.items?.length!==1?'s':''} flagged for WO ${wo}. Warehouse notified.`;
+    document.getElementById('success-screen').classList.add('show');
+
+  } catch(err){
+    setStatus('Something went wrong. Try again.');
+    btn.disabled=false;
+    document.getElementById('btn-label').textContent='Submit restocking request';
+  }
+}
+
+function saveRequest(request) {
+  try {
+    let existing = JSON.parse(localStorage.getItem('tlc_requests')||'[]');
+    existing.unshift(request);
+    if(existing.length>300) existing=existing.slice(0,300);
+    localStorage.setItem('tlc_requests', JSON.stringify(existing));
+  } catch(e){console.error(e);}
+}
+
+// After submit: keep name/truck/trade, clear WO + photos
+function nextWO() {
+  photos=[];
+  document.getElementById('work-order').value='';
+  document.getElementById('notes').value='';
+  renderPhotos();
+  document.getElementById('submit-btn').disabled=false;
+  document.getElementById('btn-label').textContent='Submit restocking request';
+  setStatus('');
+  document.getElementById('success-screen').classList.remove('show');
+  document.getElementById('form-wrap').classList.remove('hidden');
+  document.getElementById('work-order').focus();
+}
+
+function allDone() {
+  photos=[];
+  const s=JSON.parse(localStorage.getItem('tlc_tech')||'{}');
+  document.getElementById('tech-name').value=s.name||'';
+  document.getElementById('truck-num').value=s.truck||'';
+  document.getElementById('trade').value=s.trade||'';
+  document.getElementById('work-order').value='';
+  document.getElementById('notes').value='';
+  renderPhotos();
+  document.getElementById('submit-btn').disabled=false;
+  document.getElementById('btn-label').textContent='Submit restocking request';
+  setStatus('');
+  document.getElementById('success-screen').classList.remove('show');
+  document.getElementById('form-wrap').classList.remove('hidden');
+}
+
+// ── WAREHOUSE ──
+function loadRequests() {
+  try { allRequests=JSON.parse(localStorage.getItem('tlc_requests')||'[]'); }
+  catch { allRequests=[]; }
+  try { itemStates=JSON.parse(localStorage.getItem('tlc_item_states')||'{}'); }
+  catch { itemStates={}; }
+  updateStats();
+  renderQueue();
+}
+
+function isToday(iso) {
+  const d=new Date(iso),n=new Date();
+  return d.getDate()===n.getDate()&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();
+}
+
+function timeAgo(iso) {
+  const diff=(Date.now()-new Date(iso))/1000;
+  if(diff<60) return 'just now';
+  if(diff<3600) return Math.floor(diff/60)+'m ago';
+  if(diff<86400) return Math.floor(diff/3600)+'h ago';
+  return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+function updateStats() {
+  const today=allRequests.filter(r=>isToday(r.timestamp));
+  const pending=today.filter(r=>r.status==='pending');
+  const done=today.filter(r=>r.status==='done');
+  const totalItems=pending.reduce((s,r)=>s+(r.items?.length||0),0);
+  const trucks=new Set(pending.map(r=>r.truck)).size;
+  document.getElementById('stat-pending').textContent=pending.length;
+  document.getElementById('stat-items').textContent=totalItems;
+  document.getElementById('stat-done').textContent=done.length;
+  document.getElementById('stat-trucks').textContent=trucks;
+}
+
+function setFilter(val,btn) {
+  currentFilter=val;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderQueue();
+}
+
+function renderQueue() {
+  const search=document.getElementById('wh-search').value.toLowerCase();
+  let filtered=allRequests.filter(r=>isToday(r.timestamp));
+  if(currentFilter==='pending') filtered=filtered.filter(r=>r.status==='pending');
+  else if(currentFilter==='done') filtered=filtered.filter(r=>r.status==='done');
+  else if(currentFilter==='Res') filtered=filtered.filter(r=>r.trade.startsWith('Res'));
+  else if(currentFilter==='Comm') filtered=filtered.filter(r=>r.trade.startsWith('Comm'));
+  else if(currentFilter==='Drains') filtered=filtered.filter(r=>r.trade.includes('Drain'));
+  if(search) filtered=filtered.filter(r=>
+    r.tech.toLowerCase().includes(search)||
+    r.truck.toLowerCase().includes(search)||
+    (r.work_order||'').toLowerCase().includes(search)
+  );
+
+  const grid=document.getElementById('queue-grid');
+  if(!filtered.length){
+    grid.innerHTML=`<div class="empty-state">
+      <div class="ei">📦</div>
+      <h3>${allRequests.length===0?'No requests yet today':'No requests match this filter'}</h3>
+      <p>${allRequests.length===0?'Tech submissions will appear here instantly.':'Try a different filter.'}</p>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML=filtered.map(req=>{
+    const isDone=req.status==='done';
+    const items=req.items||[];
+    return `<div class="req-card ${isDone?'done':''}">
+      <div class="card-head">
+        <div class="truck-badge">${req.truck}</div>
+        <div class="card-head-info">
+          <div class="tech-name">${req.tech}</div>
+          <div class="trade-meta">${req.trade} · ${timeAgo(req.timestamp)}</div>
+          ${req.work_order?`<div class="wo-tag">WO ${req.work_order}</div>`:''}
+        </div>
+        <span class="status-badge ${isDone?'done':'pending'}">${isDone?'✓ Done':'Pending'}</span>
+      </div>
+      <div class="card-body">
+        ${items.length?`<ul class="item-list">${items.map((item,idx)=>{
+          const key=req.id+'_'+idx;
+          const pulled=itemStates[key];
+          return `<li class="item-row ${pulled?'pulled':''}">
+            <div class="item-check ${pulled?'checked':''}" onclick="toggleItem('${req.id}',${idx})">${pulled?'✓':''}</div>
+            <span class="item-pill ${item.status||'LOW'}">${item.status||'LOW'}</span>
+            <span class="item-desc">${item.description}</span>
+            <span class="item-qty">${item.qty_needed||''}</span>
+          </li>`;
+        }).join('')}</ul>`:'<p style="font-size:13px;color:var(--muted);padding:4px 0;">No items identified — check photos.</p>'}
+        ${req.summary?`<div class="card-summary">${req.summary}</div>`:''}
+        ${req.notes?`<div class="card-notes">Note: ${req.notes}</div>`:''}
+      </div>
+      <div class="card-foot">
+        <span class="photo-badge">📸 ${req.photo_count||0}</span>
+        <button class="mark-done-btn ${isDone?'done-state':''}" onclick="markDone('${req.id}')">
+          ${isDone?'✓ Complete':'Mark complete'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleItem(reqId,idx) {
+  const key=reqId+'_'+idx;
+  itemStates[key]=!itemStates[key];
+  localStorage.setItem('tlc_item_states',JSON.stringify(itemStates));
+  renderQueue();
+}
+
+function markDone(reqId) {
+  const req=allRequests.find(r=>r.id===reqId);
+  if(!req) return;
+  req.status=req.status==='done'?'pending':'done';
+  localStorage.setItem('tlc_requests',JSON.stringify(allRequests));
+  updateStats();
+  renderQueue();
+}
+
+setInterval(()=>{ if(document.getElementById('view-warehouse').classList.contains('active')) loadRequests(); },15000);
+</script>
+</body>
+</html>
